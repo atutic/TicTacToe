@@ -14,14 +14,15 @@ public class TicTacToeServer {
             // 1. Auf Spieler 1 warten (blockiert, bis Verbindung kommt)
             Socket socket1 = serverSocket.accept();
             System.out.println("Spieler 1 verbunden!");
+            ScoreManager scoreManager = new ScoreManager(); // Lädt Scores beim Start
             TicTacToeGame game = new TicTacToeGame();
-            ClientHandler player1 = new ClientHandler(socket1, game, 'X');
-            player1.sendMessage("MESSAGE;Warte auf Spieler 2...");
+            ClientHandler player1 = new ClientHandler(socket1, game, 'X', scoreManager);
+            player1.sendMessage(Protocol.SRV_MESSAGE + Protocol.SEPARATOR + "Warte auf Spieler 2...");
 
             // 2. Auf Spieler 2 warten
             Socket socket2 = serverSocket.accept();
             System.out.println("Spieler 2 verbunden!");
-            ClientHandler player2 = new ClientHandler(socket2, game, 'O');
+            ClientHandler player2 = new ClientHandler(socket2, game, 'O', scoreManager);
 
             // 3. Die beiden Spieler einander vorstellen (Verknüpfen)
             player1.setOpponent(player2);
@@ -32,10 +33,10 @@ public class TicTacToeServer {
             player2.start();
 
             // 5. Spielstart signalisieren
-            player1.sendMessage("MESSAGE;Spiel startet. Du bist X.");
-            player2.sendMessage("MESSAGE;Spiel startet. Du bist O.");
-            player1.sendMessage("TURN;X"); // Spieler X beginnt
-            player2.sendMessage("TURN;X");
+            player1.sendMessage(Protocol.SRV_MESSAGE + Protocol.SEPARATOR + "Spiel startet. Du bist X.");
+            player2.sendMessage(Protocol.SRV_MESSAGE + Protocol.SEPARATOR + "Spiel startet. Du bist O.");
+            player1.sendMessage(Protocol.SRV_TURN + Protocol.SEPARATOR + "X"); // Spieler X beginnt
+            player2.sendMessage(Protocol.SRV_TURN + Protocol.SEPARATOR + "X");
 
             System.out.println("Spiel läuft. Server leitet Nachrichten weiter.");
 

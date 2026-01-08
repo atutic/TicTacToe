@@ -13,15 +13,19 @@ public class ClientHandler extends Thread {
     private ClientHandler opponent;
     private TicTacToeGame game;
     private char playerSymbol;
+    private ScoreManager scoreManager;
+    private String playerName;
 
-    public ClientHandler(Socket socket, TicTacToeGame game, char playerSymbol) {
+    public ClientHandler(Socket socket, TicTacToeGame game, char playerSymbol, ScoreManager scoreManager) {
         this.socket = socket;
         this.game = game;
         this.playerSymbol = playerSymbol;
+        this.scoreManager = scoreManager;
         try {
             out = new PrintWriter(socket.getOutputStream(), true);
             in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-            sendMessage("WELCOME;" + playerSymbol);
+            sendMessage(Protocol.SRV_WELCOME + Protocol.SEPARATOR + playerSymbol);
+            sendMessage(Protocol.SRV_MESSAGE + Protocol.SEPARATOR + "Bitte mit LOGIN;DeinName anmelden.");
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -40,23 +44,44 @@ public class ClientHandler extends Thread {
     }
 
     // Der Code in run() läuft permanent im Hintergrund
+    public String getPlayerName() {
+        return playerName;
+    }
+
     @Override
     public void run() {
         try {
+            // 1. Auf LOGIN warten
+            String loginLine = in.readLine();
+            if (loginLine != null && loginLine.startsWith(Protocol.CMD_LOGIN + Protocol.SEPARATOR)) {
+                String[] parts = loginLine.split(";");
+                if (parts.length > 1) {
+                    this.playerName = parts[1];
+                    System.out.println("Spieler " + playerSymbol + " hat sich als '" + this.playerName + "' angemeldet.");
+                    sendMessage(Protocol.SRV_MESSAGE + Protocol.SEPARATOR + "Login erfolgreich, " + this.playerName);
+                } else {
+                    this.playerName = "Spieler_" + playerSymbol;
+                     sendMessage(Protocol.SRV_MESSAGE + Protocol.SEPARATOR + "Login ungültig. Du wirst '" + this.playerName + "' genannt.");
+                }
+            } else {
+                // Fallback, wenn kein korrekter Login kommt
+                this.playerName = "Spieler_" + playerSymbol;
+                 sendMessage(Protocol.SRV_MESSAGE + Protocol.SEPARATOR + "Kein Login. Du wirst '" + this.playerName + "' genannt.");
+            }
+
+            // 2. Auf Spielzüge warten
             String inputLine;
-            // Warte auf Nachrichten von DIESEM Spieler
             while ((inputLine = in.readLine()) != null) {
-                System.out.println("Empfangen von " + playerSymbol + ": " + inputLine);
+                System.out.println("Empfangen von " + playerName + ": " + inputLine);
                 String[] parts = inputLine.split(";");
                 String command = parts[0];
 
-                if ("MOVE".equals(command)) {
+                if (Protocol.CMD_MOVE.equals(command)) {
                     handleMove(parts);
                 }
-                // Weitere Befehle wie LOGIN könnten hier behandelt werden
             }
         } catch (IOException e) {
-            System.out.println("Verbindung unterbrochen.");
+            System.out.println("Verbindung zu " + (playerName != null ? playerName : "einem Spieler") + " unterbrochen.");
         } finally {
             try {
                 socket.close();
@@ -75,26 +100,34 @@ public class ClientHandler extends Thread {
 
             if (game.makeMove(x, y, playerSymbol)) {
                 // Gültiger Zug
-                opponent.sendMessage("VALID_MOVE;" + x + ";" + y + ";" + playerSymbol);
-                this.sendMessage("VALID_MOVE;" + x + ";" + y + ";" + playerSymbol);
+                opponent.sendMessage(Protocol.SRV_VALID_MOVE + Protocol.SEPARATOR + x + ";" + y + ";" + playerSymbol);
+                this.sendMessage(Protocol.SRV_VALID_MOVE + Protocol.SEPARATOR + x + ";" + y + ";" + playerSymbol);
 
                 char winner = game.checkWinner();
                 if (winner != ' ') { // Spiel ist vorbei
-                    String gameOverMsg = "GAME_OVER;" + winner;
+                    if (winner == 'D') { // Unentschieden
+                        scoreManager.recordDraw(this.playerName, opponent.getPlayerName());
+                    } else if (winner == this.playerSymbol) { // Dieser Spieler hat gewonnen
+                        scoreManager.recordGameResult(this.playerName, opponent.getPlayerName());
+                    } else { // Der Gegner hat gewonnen
+                        scoreManager.recordGameResult(opponent.getPlayerName(), this.playerName);
+                    }
+
+                    String gameOverMsg = Protocol.SRV_GAME_OVER + Protocol.SEPARATOR + winner;
                     opponent.sendMessage(gameOverMsg);
                     this.sendMessage(gameOverMsg);
                 } else {
                     // Nächster Zug
-                    String turnMsg = "TURN;" + game.getCurrentPlayer();
+                    String turnMsg = Protocol.SRV_TURN + Protocol.SEPARATOR + game.getCurrentPlayer();
                     opponent.sendMessage(turnMsg);
                     this.sendMessage(turnMsg);
                 }
             } else {
                 // Ungültiger Zug
-                this.sendMessage("ERROR;Ungültiger Zug. Du bist nicht am Zug oder das Feld ist belegt.");
+                this.sendMessage(Protocol.SRV_ERROR + Protocol.SEPARATOR + "Ungültiger Zug. Du bist nicht am Zug oder das Feld ist belegt.");
             }
         } catch (NumberFormatException e) {
-            this.sendMessage("ERROR;Ungültiges Koordinatenformat.");
+            this.sendMessage(Protocol.SRV_ERROR + Protocol.SEPARATOR + "Ungültiges Koordinatenformat.");
         }
     }
 }
