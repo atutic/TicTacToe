@@ -1,40 +1,51 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 <?import javafx.geometry.Insets?>
-<?import javafx.scene.control.Button?>
-<?import javafx.scene.control.Label?>
-<?import javafx.scene.layout.BorderPane?>
-<?import javafx.scene.layout.GridPane?>
-<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.canvas.Canvas?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
 <?import javafx.scene.text.Font?>
 
-<BorderPane fx:controller="client.GameController" prefHeight="400.0" prefWidth="350.0" xmlns:fx="http://javafx.com/fxml/1">
+<BorderPane xmlns:fx="http://javafx.com/fxml/1" fx:controller="client.GameController">
+    <padding>
+        <Insets top="16" right="16" bottom="16" left="16"/>
+    </padding>
+
     <top>
-        <Label fx:id="statusLabel" text="Warte auf Spielstart..." BorderPane.alignment="CENTER">
-            <font>
-                <Font name="Arial" size="18.0" />
-            </font>
-            <BorderPane.margin>
-                <Insets top="10.0" bottom="10.0"/>
-            </BorderPane.margin>
-        </Label>
+        <VBox spacing="8">
+            <Label text="Tic-Tac-Toe">
+                <font><Font name="Arial Bold" size="22"/></font>
+            </Label>
+            <Label fx:id="infoLabel" text="Du bist: ? | Am Zug: ?"/>
+            <Label fx:id="statusLabel" text="Warte..."/>
+        </VBox>
     </top>
+
     <center>
-        <GridPane fx:id="gameGrid" hgap="5" vgap="5">
-            <padding>
-                <Insets all="10"/>
-            </padding>
-        </GridPane>
+        <HBox spacing="16">
+            <StackPane>
+                <GridPane fx:id="gameGrid" hgap="8" vgap="8"/>
+                <Canvas fx:id="winCanvas" mouseTransparent="true"/>
+            </StackPane>
+
+            <VBox spacing="8" prefWidth="260">
+                <Label text="Chat"/>
+                <TextArea fx:id="chatArea" editable="false" wrapText="true" prefHeight="320"/>
+                <HBox spacing="8">
+                    <TextField fx:id="chatInput" promptText="Nachricht..." HBox.hgrow="ALWAYS"/>
+                    <Button fx:id="sendChatBtn" text="Senden" onAction="#sendChat"/>
+                </HBox>
+            </VBox>
+        </HBox>
     </center>
+
     <bottom>
-        <HBox alignment="CENTER" spacing="10">
-             <Label fx:id="infoLabel" text="Du bist: | Am Zug: ">
-                <font>
-                    <Font size="14.0" />
-                </font>
-            </HBox>
-            <BorderPane.margin>
-                <Insets bottom="10.0"/>
-            </BorderPane.margin>
+        <HBox spacing="8">
+            <padding>
+                <Insets top="8" right="0" bottom="0" left="0"/>
+            </padding>
+            <Button fx:id="rematchBtn" text="Rematch" onAction="#requestRematch" disable="true"/>
+            <Button fx:id="backBtn" text="Zurück in die Lobby" onAction="#backToLobby" disable="true"/>
+        </HBox>
     </bottom>
 </BorderPane>

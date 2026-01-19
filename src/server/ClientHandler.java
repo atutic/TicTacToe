@@ -1,133 +1,228 @@
 package server;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.PrintWriter;
+import java.io.*;
 import java.net.Socket;
 
 public class ClientHandler extends Thread {
-    private Socket socket;
+
+    private final Socket socket;
+    private final TicTacToeServer server;
+
     private PrintWriter out;
     private BufferedReader in;
-    private ClientHandler opponent;
-    private TicTacToeGame game;
-    private char playerSymbol;
-    private ScoreManager scoreManager;
-    private String playerName;
 
-    public ClientHandler(Socket socket, TicTacToeGame game, char playerSymbol, ScoreManager scoreManager) {
+    private String playerName = "";
+    private String mode = "HUMAN";
+    private int timerSec = 15;
+
+    // session
+    private volatile MatchSession session;
+    private volatile char symbol = '?';
+    private volatile ClientHandler opponent;
+
+    // rematch
+    private boolean rematchOfferReceived = false;
+
+    public ClientHandler(Socket socket, TicTacToeServer server) {
         this.socket = socket;
-        this.game = game;
-        this.playerSymbol = playerSymbol;
-        this.scoreManager = scoreManager;
+        this.server = server;
+
         try {
             out = new PrintWriter(socket.getOutputStream(), true);
             in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-            sendMessage(Protocol.SRV_WELCOME + Protocol.SEPARATOR + playerSymbol);
-            sendMessage(Protocol.SRV_MESSAGE + Protocol.SEPARATOR + "Bitte mit LOGIN;DeinName anmelden.");
+            sendMessage(Protocol.SRV_MESSAGE + Protocol.SEPARATOR + "Verbunden. Bitte LOGIN;DeinName senden.");
         } catch (IOException e) {
-            e.printStackTrace();
+            System.out.println("Init-Fehler: " + e.getMessage());
         }
     }
 
-    // Setter, um den Gegner zuzuweisen (damit wir wissen, an wen wir senden müssen)
-    public void setOpponent(ClientHandler opponent) {
-        this.opponent = opponent;
+    // BotSents
+    public static final class BotSentinel extends ClientHandler {
+        public BotSentinel() { super(null, null); }
     }
 
-    // Methode, um eine Nachricht an DIESEN Spieler zu senden
-    public void sendMessage(String message) {
-        if (out != null) {
-            out.println(message);
-        }
+    public void sendMessage(String msg) {
+        if (out != null) out.println(msg);
     }
 
-    // Der Code in run() läuft permanent im Hintergrund
     public String getPlayerName() {
-        return playerName;
+        return (playerName == null || playerName.isBlank()) ? "Spieler" : playerName;
+    }
+
+    public String getMode() { return mode; }
+    public int getTimerSec() { return timerSec; }
+    public char getSymbol() { return symbol; }
+
+    public void setSession(MatchSession s, char sym, ClientHandler opp) {
+        this.session = s;
+        this.symbol = sym;
+        this.opponent = opp;
+        this.rematchOfferReceived = false;
+    }
+
+    // komplett reset (Lobby / Disconnect)
+    public void clearSession() {
+        this.session = null;
+        this.symbol = '?';
+        this.opponent = null;
+        this.rematchOfferReceived = false;
+    }
+
+    // Match vorbei aber Rematch soll noch gehen
+    public void endMatchKeepOpponent() {
+        this.session = null;
+        this.rematchOfferReceived = false;
+        // symbol + opponent bleiben absichtlich
     }
 
     @Override
     public void run() {
         try {
-            // 1. Auf LOGIN warten
-            String loginLine = in.readLine();
-            if (loginLine != null && loginLine.startsWith(Protocol.CMD_LOGIN + Protocol.SEPARATOR)) {
-                String[] parts = loginLine.split(";");
-                if (parts.length > 1) {
-                    this.playerName = parts[1];
-                    System.out.println("Spieler " + playerSymbol + " hat sich als '" + this.playerName + "' angemeldet.");
-                    sendMessage(Protocol.SRV_MESSAGE + Protocol.SEPARATOR + "Login erfolgreich, " + this.playerName);
-                } else {
-                    this.playerName = "Spieler_" + playerSymbol;
-                     sendMessage(Protocol.SRV_MESSAGE + Protocol.SEPARATOR + "Login ungültig. Du wirst '" + this.playerName + "' genannt.");
-                }
-            } else {
-                // Fallback, wenn kein korrekter Login kommt
-                this.playerName = "Spieler_" + playerSymbol;
-                 sendMessage(Protocol.SRV_MESSAGE + Protocol.SEPARATOR + "Kein Login. Du wirst '" + this.playerName + "' genannt.");
-            }
+            String line;
+            while ((line = in.readLine()) != null) {
+                if (line.isBlank()) continue;
 
-            // 2. Auf Spielzüge warten
-            String inputLine;
-            while ((inputLine = in.readLine()) != null) {
-                System.out.println("Empfangen von " + playerName + ": " + inputLine);
-                String[] parts = inputLine.split(";");
-                String command = parts[0];
+                String[] parts = line.split(Protocol.SEPARATOR, -1);
+                String cmd = parts[0];
 
-                if (Protocol.CMD_MOVE.equals(command)) {
-                    handleMove(parts);
+                switch (cmd) {
+                    case Protocol.CMD_LOGIN -> handleLogin(parts);
+                    case Protocol.CMD_SETTINGS -> handleSettings(parts);
+
+                    case Protocol.CMD_LIST -> server.sendRoomsTo(this);
+                    case Protocol.CMD_HOST -> server.hostRoom(this, parts.length >= 2 ? parts[1] : "");
+                    case Protocol.CMD_JOIN -> {
+                        if (parts.length < 2) sendMessage(Protocol.SRV_ERROR + Protocol.SEPARATOR + "JOIN braucht Room-ID.");
+                        else server.joinRoom(this, parts[1].trim());
+                    }
+
+                    case Protocol.CMD_SCORE_REQ -> server.sendScoreboardTo(this);
+
+                    case Protocol.CMD_HISTORY_REQ -> handleHistory(parts);
+
+                    case Protocol.CMD_MOVE -> handleMove(parts);
+                    case Protocol.CMD_CHAT -> handleChat(parts);
+
+                    case Protocol.CMD_REMATCH -> handleRematchOffer();
+                    case Protocol.CMD_REMATCH_ACCEPT -> handleRematchAccept();
+                    case Protocol.CMD_REMATCH_DECLINE -> handleRematchDecline("abgelehnt");
+
+                    case Protocol.CMD_LEAVE -> handleLeaveToLobby();
+
+                    case Protocol.CMD_QUIT -> { close(); return; }
+                    default -> { /* ignore */ }
                 }
             }
-        } catch (IOException e) {
-            System.out.println("Verbindung zu " + (playerName != null ? playerName : "einem Spieler") + " unterbrochen.");
+        } catch (IOException ignored) {
         } finally {
-            try {
-                socket.close();
-            } catch (IOException e) {
-                e.printStackTrace();
+            // disconnect mittndrinnen
+            if (opponent != null) {
+                opponent.sendMessage(Protocol.SRV_OPPONENT_LEFT);
+                opponent.handleRematchDecline("Gegner getrennt");
+                opponent.clearSession();
             }
+            close();
+            if (server != null) server.unregister(this);
         }
     }
 
-    private void handleMove(String[] parts) {
-        if (parts.length < 3) return; // Ungültiges Format
-
-        try {
-            int x = Integer.parseInt(parts[1]);
-            int y = Integer.parseInt(parts[2]);
-
-            if (game.makeMove(x, y, playerSymbol)) {
-                // Gültiger Zug
-                opponent.sendMessage(Protocol.SRV_VALID_MOVE + Protocol.SEPARATOR + x + ";" + y + ";" + playerSymbol);
-                this.sendMessage(Protocol.SRV_VALID_MOVE + Protocol.SEPARATOR + x + ";" + y + ";" + playerSymbol);
-
-                char winner = game.checkWinner();
-                if (winner != ' ') { // Spiel ist vorbei
-                    if (winner == 'D') { // Unentschieden
-                        scoreManager.recordDraw(this.playerName, opponent.getPlayerName());
-                    } else if (winner == this.playerSymbol) { // Dieser Spieler hat gewonnen
-                        scoreManager.recordGameResult(this.playerName, opponent.getPlayerName());
-                    } else { // Der Gegner hat gewonnen
-                        scoreManager.recordGameResult(opponent.getPlayerName(), this.playerName);
-                    }
-
-                    String gameOverMsg = Protocol.SRV_GAME_OVER + Protocol.SEPARATOR + winner;
-                    opponent.sendMessage(gameOverMsg);
-                    this.sendMessage(gameOverMsg);
-                } else {
-                    // Nächster Zug
-                    String turnMsg = Protocol.SRV_TURN + Protocol.SEPARATOR + game.getCurrentPlayer();
-                    opponent.sendMessage(turnMsg);
-                    this.sendMessage(turnMsg);
-                }
-            } else {
-                // Ungültiger Zug
-                this.sendMessage(Protocol.SRV_ERROR + Protocol.SEPARATOR + "Ungültiger Zug. Du bist nicht am Zug oder das Feld ist belegt.");
-            }
-        } catch (NumberFormatException e) {
-            this.sendMessage(Protocol.SRV_ERROR + Protocol.SEPARATOR + "Ungültiges Koordinatenformat.");
+    private void handleLogin(String[] parts) {
+        if (parts.length < 2 || parts[1].isBlank()) {
+            playerName = "Spieler";
+            sendMessage(Protocol.SRV_MESSAGE + Protocol.SEPARATOR + "Login ungültig. Du bist '" + playerName + "'.");
+            return;
         }
+        playerName = parts[1].trim();
+        sendMessage(Protocol.SRV_MESSAGE + Protocol.SEPARATOR + "Login erfolgreich: " + playerName);
+    }
+
+    private void handleSettings(String[] parts) {
+        if (parts.length >= 2) mode = parts[1].trim();
+        if (parts.length >= 3) {
+            try { timerSec = Math.max(3, Integer.parseInt(parts[2].trim())); }
+            catch (Exception ignored) {}
+        }
+        sendMessage(Protocol.SRV_MESSAGE + Protocol.SEPARATOR + "Settings: " + mode + ", " + timerSec + "s");
+    }
+
+    private void handleHistory(String[] parts) {
+        // HISTORY;player;from;to
+        String player = parts.length >= 2 ? parts[1] : "";
+        String from = parts.length >= 3 ? parts[2] : "";
+        String to = parts.length >= 4 ? parts[3] : "";
+        server.sendHistoryTo(this, player, from, to);
+    }
+
+    private void handleMove(String[] parts) {
+        if (session == null) {
+            sendMessage(Protocol.SRV_ERROR + Protocol.SEPARATOR + "Du bist in keinem Match.");
+            return;
+        }
+        if (parts.length < 3) return;
+        try {
+            int r = Integer.parseInt(parts[1]);
+            int c = Integer.parseInt(parts[2]);
+            session.onMove(this, r, c);
+        } catch (Exception e) {
+            sendMessage(Protocol.SRV_ERROR + Protocol.SEPARATOR + "Ungültiges Koordinatenformat.");
+        }
+    }
+
+    private void handleChat(String[] parts) {
+        if (session == null) return;
+        if (parts.length < 2) return;
+        String msg = parts[1].replace(";", ",").trim();
+        if (msg.isEmpty()) return;
+        session.onChat(this, msg);
+    }
+
+    private void handleLeaveToLobby() {
+        // Lobby = Rematch ablehnen
+        handleRematchDecline("Gegner ist in die Lobby gegangen.");
+
+        // Gegner informieren, damit der nur noch "Zurück" hat
+        if (opponent != null) {
+            opponent.sendMessage(Protocol.SRV_OPPONENT_LEFT);
+            opponent.clearSession();
+        }
+
+        clearSession();
+        sendMessage(Protocol.SRV_MESSAGE + Protocol.SEPARATOR + "Zurück in Lobby.");
+        server.sendRoomsTo(this);
+    }
+
+    private void handleRematchOffer() {
+        if (opponent == null) {
+            sendMessage(Protocol.SRV_ERROR + Protocol.SEPARATOR + "Kein Gegner für Rematch.");
+            return;
+        }
+        opponent.rematchOfferReceived = true;
+        opponent.sendMessage(Protocol.SRV_REMATCH_OFFER + Protocol.SEPARATOR + getPlayerName());
+        sendMessage(Protocol.SRV_MESSAGE + Protocol.SEPARATOR + "Rematch-Angebot gesendet.");
+    }
+
+    private void handleRematchAccept() {
+        if (opponent == null) {
+            sendMessage(Protocol.SRV_ERROR + Protocol.SEPARATOR + "Kein Gegner für Rematch.");
+            return;
+        }
+        if (!rematchOfferReceived) {
+            sendMessage(Protocol.SRV_ERROR + Protocol.SEPARATOR + "Kein Rematch-Angebot vorhanden.");
+            return;
+        }
+        server.startRematchSwapped(this, opponent);
+    }
+
+    void handleRematchDecline(String reason) {
+        if (opponent != null) {
+            opponent.sendMessage(Protocol.SRV_REMATCH_DECLINED + Protocol.SEPARATOR + reason);
+        }
+        rematchOfferReceived = false;
+    }
+
+    private void close() {
+        try { if (in != null) in.close(); } catch (IOException ignored) {}
+        if (out != null) out.close();
+        try { if (socket != null) socket.close(); } catch (IOException ignored) {}
     }
 }

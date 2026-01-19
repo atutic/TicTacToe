@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.scene.text.Font?>
+
+<BorderPane xmlns:fx="http://javafx.com/fxml/1" fx:controller="client.HistoryController">
+    <padding>
+        <Insets top="16" right="16" bottom="16" left="16"/>
+    </padding>
+
+    <top>
+        <VBox spacing="8">
+            <Label text="Match-History">
+                <font><Font name="Arial Bold" size="22"/></font>
+            </Label>
+
+            <HBox spacing="8">
+                <TextField fx:id="playerFilterField" promptText="Filter Spielername (optional)" HBox.hgrow="ALWAYS"/>
+                <DatePicker fx:id="fromDate"/>
+                <DatePicker fx:id="toDate"/>
+                <Button text="Suchen" onAction="#search"/>
+                <Button text="Zurück" onAction="#back"/>
+            </HBox>
+
+            <Label fx:id="statusLabel" text=""/>
+        </VBox>
+    </top>
+
+    <center>
+        <TableView fx:id="table">
+            <columns>
+                <TableColumn fx:id="colDate" text="Datum" prefWidth="180"/>
+                <TableColumn fx:id="colX" text="Spieler X" prefWidth="160"/>
+                <TableColumn fx:id="colO" text="Spieler O" prefWidth="160"/>
+                <TableColumn fx:id="colWinner" text="Winner" prefWidth="80"/>
+            </columns>
+        </TableView>
+    </center>
+</BorderPane>

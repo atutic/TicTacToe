@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.scene.text.Font?>
+
+<BorderPane xmlns:fx="http://javafx.com/fxml/1" fx:controller="client.ScoreboardController">
+    <padding>
+        <Insets top="16" right="16" bottom="16" left="16"/>
+    </padding>
+
+    <top>
+        <VBox spacing="8">
+            <Label text="Scoreboard">
+                <font><Font name="Arial Bold" size="22"/></font>
+            </Label>
+
+            <HBox spacing="8">
+                <Button text="Aktualisieren" onAction="#refresh"/>
+                <Button text="Zurück" onAction="#back"/>
+            </HBox>
+
+            <Label fx:id="statusLabel" text=""/>
+        </VBox>
+    </top>
+
+    <center>
+        <TableView fx:id="table">
+            <columns>
+                <TableColumn fx:id="colName" text="Spieler" prefWidth="220"/>
+                <TableColumn fx:id="colW" text="W" prefWidth="60"/>
+                <TableColumn fx:id="colL" text="L" prefWidth="60"/>
+                <TableColumn fx:id="colD" text="D" prefWidth="60"/>
+            </columns>
+        </TableView>
+    </center>
+</BorderPane>

@@ -1,27 +1,61 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 <?import javafx.geometry.Insets?>
-<?import javafx.scene.control.Button?>
-<?import javafx.scene.control.Label?>
-<?import javafx.scene.control.TextField?>
-<?import javafx.scene.layout.VBox?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
 <?import javafx.scene.text.Font?>
 
-<VBox alignment="CENTER" spacing="20.0" xmlns:fx="http://javafx.com/fxml/1" xmlns="http://javafx.com/javafx/17.0.2-ea" fx:controller="client.LobbyController">
+<BorderPane xmlns:fx="http://javafx.com/fxml/1" fx:controller="client.LobbyController">
     <padding>
-        <Insets bottom="20.0" left="20.0" right="20.0" top="20.0" />
+        <Insets top="16" right="16" bottom="16" left="16"/>
     </padding>
 
-    <Label text="Tic-Tac-Toe Online">
-        <font>
-            <Font name="Arial Bold" size="24.0" />
-        </font>
-    </Label>
+    <top>
+        <VBox spacing="8">
+            <Label text="Tic-Tac-Toe – Lobby">
+                <font><Font name="Arial Bold" size="22"/></font>
+            </Label>
+            <Label fx:id="statusLabel" text="Nicht verbunden."/>
+        </VBox>
+    </top>
 
-    <TextField fx:id="hostnameField" promptText="Server-IP (z.B. localhost)" />
-    <TextField fx:id="portField" promptText="Port (z.B. 8088)" text="8088"/>
-    <TextField fx:id="usernameField" promptText="Ihr Spielername" />
+    <center>
+        <HBox spacing="16">
+            <VBox spacing="10">
+                <Label text="Verbindung"/>
+                <TextField fx:id="hostnameField" promptText="Server (z.B. localhost)"/>
+                <TextField fx:id="portField" promptText="Port (z.B. 8088)"/>
+                <TextField fx:id="usernameField" promptText="Spielername"/>
 
-    <Button onAction="#connectToServer" text="Verbinden" />
-    <Label fx:id="statusLabel" textFill="RED" />
-</VBox>
+                <Separator/>
+
+                <Label text="Settings"/>
+                <ChoiceBox fx:id="modeChoice"/>
+                <HBox spacing="8">
+                    <Label text="Timer (s)"/>
+                    <Spinner fx:id="timerSpinner"/>
+                </HBox>
+
+                <Button fx:id="connectBtn" text="Verbinden" onAction="#connect"/>
+                <Button fx:id="refreshBtn" text="Räume aktualisieren" onAction="#refreshRooms" disable="true"/>
+            </VBox>
+
+            <VBox spacing="10" HBox.hgrow="ALWAYS">
+                <Label text="Räume"/>
+                <ListView fx:id="roomsList" prefWidth="320" prefHeight="220"/>
+                <HBox spacing="8">
+                    <TextField fx:id="roomNameField" promptText="Room-Name (optional)" HBox.hgrow="ALWAYS"/>
+                    <Button fx:id="hostBtn" text="Host" onAction="#hostRoom" disable="true"/>
+                    <Button fx:id="joinBtn" text="Join" onAction="#joinRoom" disable="true"/>
+                </HBox>
+
+                <Separator/>
+
+                <HBox spacing="8">
+                    <Button fx:id="scoresBtn" text="Scoreboard" onAction="#requestScores" disable="true"/>
+                    <Button fx:id="historyBtn" text="Match-History" onAction="#openHistory" disable="true"/>
+                </HBox>
+            </VBox>
+        </HBox>
+    </center>
+</BorderPane>

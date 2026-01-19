@@ -1,7 +1,7 @@
 package server;
 
 import java.io.*;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class ScoreManager {
@@ -58,22 +58,35 @@ public class ScoreManager {
     }
 
     public synchronized void recordGameResult(String winnerName, String loserName) {
-        // Sieger aktualisieren
         ScoreEntry winner = scores.computeIfAbsent(winnerName, name -> new ScoreEntry(name, 0, 0));
         winner.wins++;
 
-        // Verlierer aktualisieren
         ScoreEntry loser = scores.computeIfAbsent(loserName, name -> new ScoreEntry(name, 0, 0));
         loser.losses++;
 
         saveScores();
         System.out.println("Spielergebnis gespeichert: Gewinner=" + winnerName + ", Verlierer=" + loserName);
     }
+
     public synchronized void recordDraw(String player1Name, String player2Name) {
-        // Bei Unentschieden werden keine Wins/Losses vergeben, aber die Spieler werden ggf. angelegt.
         scores.computeIfAbsent(player1Name, name -> new ScoreEntry(name, 0, 0));
         scores.computeIfAbsent(player2Name, name -> new ScoreEntry(name, 0, 0));
         saveScores();
         System.out.println("Spielergebnis gespeichert: Unentschieden zwischen " + player1Name + " und " + player2Name);
+    }
+
+    // PROTOCOL PAYLOAD: name|wins|losses|draws (draws=0 hier)
+    public synchronized String getScoreboardPayload() {
+        List<ScoreEntry> list = new ArrayList<>(scores.values());
+        list.sort(Comparator.comparingInt((ScoreEntry e) -> e.wins).reversed().thenComparing(e -> e.name));
+
+        StringBuilder sb = new StringBuilder();
+        boolean first = true;
+        for (ScoreEntry e : list) {
+            if (!first) sb.append(",");
+            first = false;
+            sb.append(e.name).append("|").append(e.wins).append("|").append(e.losses).append("|0");
+        }
+        return sb.toString();
     }
 }
