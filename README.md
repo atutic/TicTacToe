@@ -1,3 +1,9 @@
+Code mit 
+https://www.tutorialspoint.com/online_java_formatter.htm
+sauber formatiert
+
+
+
 TicTacToeProject – Mini-Startanleitung (TXT)
 ===========================================
 
