@@ -80,7 +80,7 @@ public class TicTacToeServer {
         host.sendMessage(Protocol.SRV_MESSAGE + Protocol.SEPARATOR + "Room erstellt: " + r.name + " (ID " + id + ")");
         broadcastRooms();
 
-        // BOT: sofort starten gegen Bot weil eh kein zweiter notwendig
+        // BOT: sofort starten gegen Bot weil eh kein zweiter notwendig --> Bitte nochmal gegenchecken Bot timed manchmal aus
         if ("BOT".equalsIgnoreCase(r.mode)) {
             rooms.remove(id);
             broadcastRooms();
