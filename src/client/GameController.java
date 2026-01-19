@@ -117,7 +117,7 @@ public class GameController {
 
     @FXML
     public void backToLobby() {
-        // leaving = decline (if any)
+        // leaving = decline
         if (gameOver) {
             NetworkClient.getInstance().sendMessage(Protocol.CMD_REMATCH_DECLINE);
         }
