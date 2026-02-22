@@ -17,6 +17,8 @@ public class ScoreboardController {
     @FXML private TableColumn<String[], String> colW;
     @FXML private TableColumn<String[], String> colL;
     @FXML private TableColumn<String[], String> colD;
+    @FXML private TableColumn<String[], String> colElo;
+    @FXML private TableColumn<String[], String> colTWins;
 
     @FXML private Label statusLabel;
 
@@ -29,6 +31,8 @@ public class ScoreboardController {
         colW.setCellValueFactory(d -> new SimpleStringProperty(d.getValue()[1]));
         colL.setCellValueFactory(d -> new SimpleStringProperty(d.getValue()[2]));
         colD.setCellValueFactory(d -> new SimpleStringProperty(d.getValue()[3]));
+        colElo.setCellValueFactory(d -> new SimpleStringProperty(d.getValue()[4]));
+        colTWins.setCellValueFactory(d -> new SimpleStringProperty(d.getValue()[5]));
 
         table.setItems(rows);
 
@@ -52,7 +56,7 @@ public class ScoreboardController {
         try {
             Main.changeScene("/client/lobby.fxml");
         } catch (Exception e) {
-            e.printStackTrace();
+            System.out.println("[Scoreboard] Scene-Wechsel fehlgeschlagen: " + e.getMessage());
         }
     }
 
@@ -66,7 +70,9 @@ public class ScoreboardController {
                     // name|w|l|d,name|w|l|d
                     for (String entry : payload.split(",")) {
                         String[] p = entry.split("\\|");
-                        if (p.length >= 4) buffer.add(new String[]{p[0], p[1], p[2], p[3]});
+                        if (p.length >= 6) buffer.add(new String[]{p[0], p[1], p[2], p[3], p[4], p[5]});
+                        else if (p.length >= 5) buffer.add(new String[]{p[0], p[1], p[2], p[3], p[4], "0"});
+                        else if (p.length >= 4) buffer.add(new String[]{p[0], p[1], p[2], p[3], "-", "0"});
                     }
                 }
 

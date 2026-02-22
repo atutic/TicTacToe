@@ -28,10 +28,12 @@
     <center>
         <TableView fx:id="table">
             <columns>
-                <TableColumn fx:id="colName" text="Spieler" prefWidth="220"/>
-                <TableColumn fx:id="colW" text="W" prefWidth="60"/>
-                <TableColumn fx:id="colL" text="L" prefWidth="60"/>
-                <TableColumn fx:id="colD" text="D" prefWidth="60"/>
+                <TableColumn fx:id="colName" text="Spieler" prefWidth="150"/>
+                <TableColumn fx:id="colW" text="W" prefWidth="45"/>
+                <TableColumn fx:id="colL" text="L" prefWidth="45"/>
+                <TableColumn fx:id="colD" text="D" prefWidth="45"/>
+                <TableColumn fx:id="colElo" text="Elo" prefWidth="70"/>
+                <TableColumn fx:id="colTWins" text="T-Wins" prefWidth="60"/>
             </columns>
         </TableView>
     </center>

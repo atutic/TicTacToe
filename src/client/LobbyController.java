@@ -20,14 +20,17 @@ public class LobbyController {
     @FXML private Button refreshBtn;
     @FXML private Button hostBtn;
     @FXML private Button joinBtn;
+    @FXML private Button spectateBtn;
     @FXML private Button scoresBtn;
     @FXML private Button historyBtn;
+    @FXML private Button tournamentBtn;
 
     @FXML private ListView<String> roomsList;
     @FXML private TextField roomNameField;
 
     private Settings settings;
     private static String pendingStartMsg = null;
+    private static String pendingSpectateMsg = null;
 
     @FXML
     public void initialize() {
@@ -57,16 +60,22 @@ public class LobbyController {
 
             statusLabel.setText("Verbunden als " + settings.username + " (" + settings.mode + ", " + settings.timerSec + "s)");
 
-            refreshBtn.setDisable(false);
-            hostBtn.setDisable(false);
-            joinBtn.setDisable(false);
-            scoresBtn.setDisable(false);
-            historyBtn.setDisable(false);
+            enableButtons();
 
             nc.sendMessage(Protocol.CMD_LIST);
         } catch (Exception e) {
             statusLabel.setText("Auto-Connect fehlgeschlagen: " + e.getMessage());
         }
+    }
+
+    private void enableButtons() {
+        refreshBtn.setDisable(false);
+        hostBtn.setDisable(false);
+        joinBtn.setDisable(false);
+        spectateBtn.setDisable(false);
+        scoresBtn.setDisable(false);
+        historyBtn.setDisable(false);
+        tournamentBtn.setDisable(false);
     }
 
     @FXML
@@ -105,11 +114,7 @@ public class LobbyController {
 
             statusLabel.setText("Verbunden als " + user + " (" + mode + ", " + timerSec + "s)");
 
-            refreshBtn.setDisable(false);
-            hostBtn.setDisable(false);
-            joinBtn.setDisable(false);
-            scoresBtn.setDisable(false);
-            historyBtn.setDisable(false);
+            enableButtons();
 
             nc.sendMessage(Protocol.CMD_LIST);
 
@@ -140,23 +145,51 @@ public class LobbyController {
     }
 
     @FXML
+    public void spectateRoom() {
+        String sel = roomsList.getSelectionModel().getSelectedItem();
+        if (sel == null || sel.isBlank()) return;
+
+        // Session-ID ist das erste Feld
+        String sessionId = sel.split("\\|")[0].trim();
+
+        // Prüfen ob INGAME (letztes Feld)
+        String[] parts = sel.split("\\|");
+        String status = parts.length >= 6 ? parts[5].trim() : "";
+        if (!"INGAME".equals(status)) {
+            statusLabel.setText("Nur laufende Spiele können zugeschaut werden.");
+            return;
+        }
+
+        NetworkClient.getInstance().sendMessage(Protocol.CMD_SPECTATE + Protocol.SEPARATOR + sessionId);
+    }
+
+    @FXML
     public void requestScores() {
         try {
             Main.changeScene("/client/scoreboard.fxml");
         } catch (Exception e) {
-            e.printStackTrace();
+            System.out.println("[Lobby] View-Wechsel fehlgeschlagen: " + e.getMessage());
             statusLabel.setText("Scoreboard-View fehlgeschlagen: " + e.getMessage());
         }
     }
-
 
     @FXML
     public void openHistory() {
         try {
             Main.changeScene("/client/history.fxml");
         } catch (Exception e) {
-            e.printStackTrace();
+            System.out.println("[Lobby] View-Wechsel fehlgeschlagen: " + e.getMessage());
             statusLabel.setText("History-View fehlgeschlagen: " + e.getMessage());
+        }
+    }
+
+    @FXML
+    public void openTournament() {
+        try {
+            Main.changeScene("/client/tournament.fxml");
+        } catch (Exception e) {
+            System.out.println("[Lobby] View-Wechsel fehlgeschlagen: " + e.getMessage());
+            statusLabel.setText("Turnier-View fehlgeschlagen: " + e.getMessage());
         }
     }
 
@@ -164,6 +197,16 @@ public class LobbyController {
         String tmp = pendingStartMsg;
         pendingStartMsg = null;
         return tmp;
+    }
+
+    public static String consumePendingSpectateMsg() {
+        String tmp = pendingSpectateMsg;
+        pendingSpectateMsg = null;
+        return tmp;
+    }
+
+    public static void setPendingStartMsg(String msg) {
+        pendingStartMsg = msg;
     }
 
     private void onServerMessage(String msg) {
@@ -174,8 +217,21 @@ public class LobbyController {
                     NetworkClient.getInstance().clearListeners();
                     Main.changeScene("/client/game.fxml");
                 } catch (Exception e) {
-                    e.printStackTrace();
+                    System.out.println("[Lobby] Scene-Wechsel fehlgeschlagen: " + e.getMessage());
                     statusLabel.setText("Scene-Wechsel fehlgeschlagen: " + e.getMessage());
+                }
+                return;
+            }
+
+            // Spectator: Server sendet SSTART -> wechsle in Game-View als Zuschauer
+            if (msg.startsWith(Protocol.SRV_SPECTATE_START + Protocol.SEPARATOR)) {
+                pendingSpectateMsg = msg;
+                try {
+                    NetworkClient.getInstance().clearListeners();
+                    Main.changeScene("/client/game.fxml");
+                } catch (Exception e) {
+                    System.out.println("[Lobby] Scene-Wechsel fehlgeschlagen: " + e.getMessage());
+                    statusLabel.setText("Scene-Wechsel (Spectator) fehlgeschlagen: " + e.getMessage());
                 }
                 return;
             }

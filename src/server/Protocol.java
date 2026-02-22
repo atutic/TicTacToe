@@ -23,6 +23,14 @@ public final class Protocol {
 
     public static final String CMD_QUIT = "QUIT";                 // QUIT connection close
 
+    public static final String CMD_SPECTATE = "SPECTATE";          // SPECTATE;sessionId
+
+    // Tournament Client -> Server
+    public static final String CMD_HOST_TOURNAMENT = "THOST";      // THOST;name;maxPlayers
+    public static final String CMD_JOIN_TOURNAMENT = "TJOIN";      // TJOIN;tournamentId
+    public static final String CMD_START_TOURNAMENT = "TSTART";    // TSTART;tournamentId
+    public static final String CMD_LIST_TOURNAMENTS = "TLIST";     // TLIST
+
     // Server -> Client
     public static final String SRV_WELCOME = "WELCOME";           // WELCOME;X|O
     public static final String SRV_MESSAGE = "MESSAGE";           // MESSAGE;text
@@ -42,8 +50,20 @@ public final class Protocol {
     public static final String SRV_REMATCH_DECLINED = "RDECL";    // RDECL;reason
     public static final String SRV_OPPONENT_LEFT = "OLEFT";       // OLEFT
 
-    public static final String SRV_SCOREBOARD = "SCOREBOARD";     // SCOREBOARD;name|w|l|d,name|...
+    public static final String SRV_SCOREBOARD = "SCOREBOARD";     // SCOREBOARD;name|w|l|d|elo,name|...
 
     public static final String SRV_HISTORY_LINE = "HLINE";        // HLINE;timestamp;X;O;winner;moves
     public static final String SRV_HISTORY_END = "HEND";          // HEND
+
+    public static final String SRV_SPECTATOR_JOINED = "SJOIN";    // SJOIN;name
+    public static final String SRV_SPECTATE_START = "SSTART";     // SSTART;sessionId;playerX;playerO
+
+    // Tournament Server -> Client
+    public static final String SRV_TOURNAMENTS = "TROOMS";        // TROOMS;id|name|host|max|current,...
+    public static final String SRV_TOURNAMENT_HOSTED = "THOSTED"; // THOSTED;tournamentId
+    public static final String SRV_TOURNAMENT_STARTED = "TSTARTED"; // TSTARTED;tournamentId
+    public static final String SRV_TOURNAMENT_MATCH = "TMATCH";   // TMATCH;round;matchIndex;playerX;playerO
+    public static final String SRV_TOURNAMENT_RESULT = "TRESULT"; // TRESULT;round;matchIndex;winner
+    public static final String SRV_TOURNAMENT_OVER = "TOVER";     // TOVER;winnerName
+    public static final String SRV_TOURNAMENT_MSG = "TMSG";       // TMSG;text
 }

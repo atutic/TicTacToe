@@ -47,6 +47,7 @@
                     <TextField fx:id="roomNameField" promptText="Room-Name (optional)" HBox.hgrow="ALWAYS"/>
                     <Button fx:id="hostBtn" text="Host" onAction="#hostRoom" disable="true"/>
                     <Button fx:id="joinBtn" text="Join" onAction="#joinRoom" disable="true"/>
+                    <Button fx:id="spectateBtn" text="Zuschauen" onAction="#spectateRoom" disable="true"/>
                 </HBox>
 
                 <Separator/>
@@ -54,6 +55,7 @@
                 <HBox spacing="8">
                     <Button fx:id="scoresBtn" text="Scoreboard" onAction="#requestScores" disable="true"/>
                     <Button fx:id="historyBtn" text="Match-History" onAction="#openHistory" disable="true"/>
+                    <Button fx:id="tournamentBtn" text="Turnier" onAction="#openTournament" disable="true"/>
                 </HBox>
             </VBox>
         </HBox>

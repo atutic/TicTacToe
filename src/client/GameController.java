@@ -3,6 +3,7 @@ package client;
 import javafx.application.Platform;
 import javafx.fxml.FXML;
 import javafx.geometry.Bounds;
+import javafx.geometry.VPos;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.control.*;
@@ -29,6 +30,7 @@ public class GameController {
     private char mySymbol = '\0';
     private boolean myTurn = false;
     private boolean gameOver = false;
+    private boolean spectatorMode = false;
     private final char[][] board = new char[3][3];
 
     private boolean rematchRequestedByMe = false;
@@ -45,7 +47,7 @@ public class GameController {
                 final int c = col;
                 button.setOnAction(event -> handleMove(r, c));
                 buttons[row][col] = button;
-                gameGrid.add(button, c, row);
+                gameGrid.add(button, col, row);
             }
         }
 
@@ -59,6 +61,30 @@ public class GameController {
         NetworkClient.getInstance().clearListeners();
         NetworkClient.getInstance().addListener(this::processServerMessage);
 
+        // Spectator-Modus prüfen
+        String spectateMsg = LobbyController.consumePendingSpectateMsg();
+        if (spectateMsg != null) {
+            spectatorMode = true;
+            mySymbol = 'S';
+
+            // SSTART;sessionId;playerX;playerO
+            String[] p = spectateMsg.split(Protocol.SEPARATOR);
+            String px = p.length >= 3 ? p[2] : "?";
+            String po = p.length >= 4 ? p[3] : "?";
+
+            infoLabel.setText("Zuschauer | " + px + " (X) vs " + po + " (O)");
+            statusLabel.setText("Du schaust zu.");
+            setBoardEnabled(false);
+            rematchBtn.setDisable(true);
+            rematchBtn.setVisible(false);
+            backBtn.setDisable(false);
+            chatInput.setDisable(true);
+            sendChatBtn.setDisable(true);
+            clearWinLine();
+            return;
+        }
+
+        // Normaler Spieler-Modus
         String start = LobbyController.consumePendingStartMsg();
         if (start != null) {
             String[] p = start.split(Protocol.SEPARATOR);
@@ -83,6 +109,7 @@ public class GameController {
     }
 
     private void handleMove(int row, int col) {
+        if (spectatorMode) return;
         if (gameOver || !myTurn) return;
         if (board[row][col] != '\0') return;
 
@@ -94,6 +121,7 @@ public class GameController {
 
     @FXML
     public void sendChat() {
+        if (spectatorMode) return;
         String msg = chatInput.getText();
         if (msg == null) return;
         msg = msg.trim();
@@ -106,6 +134,7 @@ public class GameController {
 
     @FXML
     public void requestRematch() {
+        if (spectatorMode) return;
         if (!gameOver) return;
 
         rematchRequestedByMe = true;
@@ -117,17 +146,22 @@ public class GameController {
 
     @FXML
     public void backToLobby() {
-        // leaving = decline
-        if (gameOver) {
-            NetworkClient.getInstance().sendMessage(Protocol.CMD_REMATCH_DECLINE);
+        if (spectatorMode) {
+            // Spectator: einfach LEAVE senden
+            NetworkClient.getInstance().sendMessage(Protocol.CMD_LEAVE);
+        } else {
+            // leaving = decline
+            if (gameOver) {
+                NetworkClient.getInstance().sendMessage(Protocol.CMD_REMATCH_DECLINE);
+            }
+            NetworkClient.getInstance().sendMessage(Protocol.CMD_LEAVE);
         }
-        NetworkClient.getInstance().sendMessage(Protocol.CMD_LEAVE);
 
         try {
             NetworkClient.getInstance().clearListeners();
             Main.changeScene("/client/lobby.fxml");
         } catch (Exception e) {
-            e.printStackTrace();
+            System.out.println("[Game] Scene-Wechsel fehlgeschlagen: " + e.getMessage());
         }
     }
 
@@ -139,7 +173,7 @@ public class GameController {
 
             switch (command) {
                 case Protocol.SRV_WELCOME:
-                    if (!payload.isEmpty()) mySymbol = payload.charAt(0);
+                    if (!spectatorMode && !payload.isEmpty()) mySymbol = payload.charAt(0);
                     break;
 
                 case Protocol.SRV_MESSAGE:
@@ -148,9 +182,14 @@ public class GameController {
 
                 case Protocol.SRV_TURN: {
                     char current = payload.isEmpty() ? '\0' : payload.charAt(0);
-                    myTurn = (current != '\0' && current == mySymbol);
-                    updateInfoLabel(current);
-                    if (!gameOver) setBoardEnabled(myTurn);
+                    if (spectatorMode) {
+                        infoLabel.setText(infoLabel.getText().split("\\|")[0].trim()
+                                + " | Am Zug: " + current);
+                    } else {
+                        myTurn = (current != '\0' && current == mySymbol);
+                        updateInfoLabel(current);
+                        if (!gameOver) setBoardEnabled(myTurn);
+                    }
                     break;
                 }
 
@@ -173,15 +212,17 @@ public class GameController {
                     break;
                 }
 
+                case Protocol.SRV_SPECTATOR_JOINED: {
+                    chatArea.appendText("[System] Zuschauer beigetreten: " + payload + "\n");
+                    break;
+                }
+
                 case Protocol.SRV_REMATCH_OFFER: {
-                    // ROFFER;from
+                    if (spectatorMode) break;
                     rematchOfferedToMe = true;
                     String from = payload.isBlank() ? "?" : payload.trim();
 
-                    if (!gameOver) {
-                        // dumm gelaufen lol
-                        break;
-                    }
+                    if (!gameOver) break;
 
                     Alert a = new Alert(Alert.AlertType.CONFIRMATION);
                     a.setTitle("Rematch");
@@ -199,7 +240,6 @@ public class GameController {
                         rematchBtn.setDisable(true);
                         backBtn.setDisable(true);
                     } else {
-                        // bleibt im Screen, kann noch Back drücken
                         statusLabel.setText("Rematch offen. Du kannst annehmen (Popup) oder in Lobby gehen.");
                         rematchBtn.setDisable(true);
                         backBtn.setDisable(false);
@@ -208,7 +248,7 @@ public class GameController {
                 }
 
                 case Protocol.SRV_REMATCH_DECLINED: {
-                    // RDECL;reason
+                    if (spectatorMode) break;
                     String reason = payload.isBlank() ? "abgelehnt" : payload;
                     statusLabel.setText("Rematch abgelehnt: " + reason);
                     rematchBtn.setDisable(true);
@@ -217,10 +257,15 @@ public class GameController {
                 }
 
                 case Protocol.SRV_OPPONENT_LEFT: {
-                    statusLabel.setText("Gegner ist weg. Du kannst nur noch zurück in die Lobby.");
-                    rematchBtn.setDisable(true);
-                    backBtn.setDisable(false);
-                    setBoardEnabled(false);
+                    if (spectatorMode) {
+                        statusLabel.setText("Spiel vorbei. Spieler hat verlassen.");
+                        backBtn.setDisable(false);
+                    } else {
+                        statusLabel.setText("Gegner ist weg. Du kannst nur noch zurück in die Lobby.");
+                        rematchBtn.setDisable(true);
+                        backBtn.setDisable(false);
+                        setBoardEnabled(false);
+                    }
                     break;
                 }
 
@@ -229,41 +274,57 @@ public class GameController {
                     myTurn = false;
                     setBoardEnabled(false);
 
+                    String resultText;
                     if ("D".equals(payload)) {
-                        statusLabel.setText("Unentschieden!");
+                        resultText = "DRAW";
+                        statusLabel.setText(resultText);
                     } else {
-                        statusLabel.setText("Spiel vorbei! Gewinner ist " + payload);
-                        drawWinLine(payload.charAt(0));
+                        char winnerSym = payload.charAt(0);
+                        drawWinLine(winnerSym);
+                        if (spectatorMode) {
+                            resultText = "Gewinner: " + winnerSym;
+                        } else if (winnerSym == mySymbol) {
+                            resultText = "WIN";
+                        } else {
+                            resultText = "LOSE";
+                        }
+                        statusLabel.setText(resultText);
                     }
 
-                    // jetzt sind die Buttons erlaubt
-                    rematchBtn.setDisable(false);
-                    backBtn.setDisable(false);
+                    // Großen Text auf Canvas zeichnen
+                    drawBigResultText(resultText);
 
                     rematchRequestedByMe = false;
                     rematchOfferedToMe = false;
+                    rematchBtn.setDisable(true);
+                    rematchBtn.setVisible(false);
+                    backBtn.setDisable(true);
+                    backBtn.setVisible(false);
+
+                    // Automatisch nach 3 Sekunden zurück in die Lobby
+                    javafx.animation.PauseTransition pause = new javafx.animation.PauseTransition(javafx.util.Duration.seconds(3));
+                    pause.setOnFinished(ev -> backToLobby());
+                    pause.play();
                     break;
 
                 case Protocol.SRV_ERROR:
                     statusLabel.setText("Fehler: " + payload);
-                    if (!gameOver) setBoardEnabled(myTurn);
+                    if (!spectatorMode && !gameOver) setBoardEnabled(myTurn);
                     break;
 
                 case Protocol.SRV_START:
-                    // Rematch startet auch über START -> reset state
-                    resetForNewMatch(payload);
+                    if (!spectatorMode) {
+                        resetForNewMatch(payload);
+                    }
                     break;
             }
         });
     }
 
     private void resetForNewMatch(String payload) {
-        // // START-Payload auswerten (egal ob komplett oder schon ohne "START;")
-
         gameOver = false;
         clearWinLine();
 
-        // clear board
         for (int r = 0; r < 3; r++) {
             for (int c = 0; c < 3; c++) {
                 board[r][c] = '\0';
@@ -273,9 +334,7 @@ public class GameController {
             }
         }
 
-        // parse symbol
         String[] p = payload.split(Protocol.SEPARATOR);
-        // payload starts with sessionId in normal format
         if (p.length >= 2 && !p[1].isEmpty()) {
             mySymbol = p[1].charAt(0);
         }
@@ -311,6 +370,13 @@ public class GameController {
     }
 
     private void setBoardEnabled(boolean enabled) {
+        if (spectatorMode) {
+            // Spectator: Board immer disabled
+            for (int row = 0; row < 3; row++)
+                for (int col = 0; col < 3; col++)
+                    buttons[row][col].setDisable(true);
+            return;
+        }
         for (int row = 0; row < 3; row++) {
             for (int col = 0; col < 3; col++) {
                 boolean isEmpty = buttons[row][col].getText() == null || buttons[row][col].getText().isEmpty();
@@ -337,6 +403,30 @@ public class GameController {
         gc.setLineWidth(6);
         gc.setStroke(javafx.scene.paint.Color.BLACK);
         gc.strokeLine(p1[0], p1[1], p2[0], p2[1]);
+    }
+
+    private void drawBigResultText(String text) {
+        GraphicsContext gc = winCanvas.getGraphicsContext2D();
+        double w = winCanvas.getWidth();
+        double h = winCanvas.getHeight();
+
+        // Halbtransparenter Hintergrund
+        gc.setFill(javafx.scene.paint.Color.color(0, 0, 0, 0.45));
+        gc.fillRect(0, h / 2 - 50, w, 100);
+
+        // Farbe wählen
+        javafx.scene.paint.Color color;
+        switch (text) {
+            case "WIN":  color = javafx.scene.paint.Color.LIMEGREEN; break;
+            case "LOSE": color = javafx.scene.paint.Color.TOMATO;    break;
+            default:     color = javafx.scene.paint.Color.LIGHTGRAY; break;
+        }
+
+        gc.setFont(new Font("Arial Bold", 72));
+        gc.setFill(color);
+        gc.setTextAlign(javafx.scene.text.TextAlignment.CENTER);
+        gc.setTextBaseline(javafx.geometry.VPos.CENTER);
+        gc.fillText(text, w / 2, h / 2);
     }
 
     private double[] centerOfCell(int row, int col) {

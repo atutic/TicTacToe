@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.scene.text.Font?>
+
+<BorderPane xmlns:fx="http://javafx.com/fxml/1" fx:controller="client.TournamentController">
+    <padding>
+        <Insets top="16" right="16" bottom="16" left="16"/>
+    </padding>
+
+    <top>
+        <VBox spacing="8">
+            <Label text="Turniermodus (K.O.-Baum)">
+                <font><Font name="Arial Bold" size="22"/></font>
+            </Label>
+            <Label fx:id="statusLabel" text=""/>
+
+            <HBox spacing="8">
+                <Button text="Zurück" onAction="#back"/>
+                <Button text="Aktualisieren" onAction="#refresh"/>
+            </HBox>
+        </VBox>
+    </top>
+
+    <center>
+        <HBox spacing="16">
+            <!-- Turnier-Liste -->
+            <VBox spacing="10" prefWidth="350">
+                <Label text="Verfügbare Turniere"/>
+                <ListView fx:id="tournamentList" prefHeight="200"/>
+
+                <Separator/>
+
+                <Label text="Neues Turnier erstellen"/>
+                <HBox spacing="8">
+                    <TextField fx:id="tournamentNameField" promptText="Turnier-Name" HBox.hgrow="ALWAYS"/>
+                </HBox>
+                <HBox spacing="8">
+                    <Label text="Max. Spieler:"/>
+                    <ChoiceBox fx:id="maxPlayersChoice"/>
+                </HBox>
+                <HBox spacing="8">
+                    <Button text="Turnier erstellen" onAction="#hostTournament"/>
+                    <Button text="Beitreten" onAction="#joinTournament"/>
+                    <Button text="Starten" onAction="#startTournament"/>
+                </HBox>
+            </VBox>
+
+            <!-- Turnier-Log -->
+            <VBox spacing="10" HBox.hgrow="ALWAYS">
+                <Label text="Turnier-Log"/>
+                <TextArea fx:id="logArea" editable="false" wrapText="true" prefHeight="360"/>
+            </VBox>
+        </HBox>
+    </center>
+</BorderPane>

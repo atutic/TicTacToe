@@ -66,7 +66,7 @@ public class HistoryController {
         try {
             Main.changeScene("/client/lobby.fxml");
         } catch (Exception e) {
-            e.printStackTrace();
+            System.out.println("[History] Scene-Wechsel fehlgeschlagen: " + e.getMessage());
         }
     }
 
