@@ -135,6 +135,17 @@ public class TournamentController {
                     statusLabel.setText("Scene-Wechsel fehlgeschlagen: " + e.getMessage());
                 }
 
+            } else if (msg.startsWith(Protocol.SRV_SPECTATE_START + Protocol.SEPARATOR)) {
+                // Eliminierter Spieler wird Zuschauer -> zum Game wechseln
+                try {
+                    NetworkClient.getInstance().clearListeners();
+                    LobbyController.setPendingSpectateMsg(msg);
+                    Main.changeScene("/client/game.fxml");
+                } catch (Exception e) {
+                    System.out.println("[Tournament] Scene-Wechsel (Spectator) fehlgeschlagen: " + e.getMessage());
+                    statusLabel.setText("Scene-Wechsel fehlgeschlagen: " + e.getMessage());
+                }
+
             } else if (msg.startsWith(Protocol.SRV_ERROR + Protocol.SEPARATOR)) {
                 statusLabel.setText("Fehler: " + msg.substring((Protocol.SRV_ERROR + Protocol.SEPARATOR).length()));
 

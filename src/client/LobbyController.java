@@ -209,6 +209,10 @@ public class LobbyController {
         pendingStartMsg = msg;
     }
 
+    public static void setPendingSpectateMsg(String msg) {
+        pendingSpectateMsg = msg;
+    }
+
     private void onServerMessage(String msg) {
         Platform.runLater(() -> {
             if (msg.startsWith(Protocol.SRV_START + Protocol.SEPARATOR)) {

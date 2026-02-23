@@ -157,11 +157,7 @@ public class Tournament {
         if (!currentRoundSessions.isEmpty() && !eliminatedPlayers.isEmpty()) {
             MatchSession firstSession = currentRoundSessions.get(0);
             for (ClientHandler elim : eliminatedPlayers) {
-                // Spectate-Start Nachricht senden
-                elim.sendMessage(Protocol.SRV_SPECTATE_START + Protocol.SEPARATOR
-                        + firstSession.getSessionId() + Protocol.SEPARATOR
-                        + firstSession.getPlayerX().getPlayerName() + Protocol.SEPARATOR
-                        + firstSession.getPlayerO().getPlayerName());
+                // addSpectator() sendet automatisch SRV_SPECTATE_START + Board-State
                 firstSession.addSpectator(elim);
             }
         }

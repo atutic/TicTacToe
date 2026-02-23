@@ -32,6 +32,7 @@ public class GameController {
     private boolean gameOver = false;
     private boolean spectatorMode = false;
     private final char[][] board = new char[3][3];
+    private javafx.animation.PauseTransition returnToLobbyPause;
 
     private boolean rematchRequestedByMe = false;
     private boolean rematchOfferedToMe = false;
@@ -64,23 +65,7 @@ public class GameController {
         // Spectator-Modus prüfen
         String spectateMsg = LobbyController.consumePendingSpectateMsg();
         if (spectateMsg != null) {
-            spectatorMode = true;
-            mySymbol = 'S';
-
-            // SSTART;sessionId;playerX;playerO
-            String[] p = spectateMsg.split(Protocol.SEPARATOR);
-            String px = p.length >= 3 ? p[2] : "?";
-            String po = p.length >= 4 ? p[3] : "?";
-
-            infoLabel.setText("Zuschauer | " + px + " (X) vs " + po + " (O)");
-            statusLabel.setText("Du schaust zu.");
-            setBoardEnabled(false);
-            rematchBtn.setDisable(true);
-            rematchBtn.setVisible(false);
-            backBtn.setDisable(false);
-            chatInput.setDisable(true);
-            sendChatBtn.setDisable(true);
-            clearWinLine();
+            setupSpectatorMode(spectateMsg);
             return;
         }
 
@@ -302,9 +287,9 @@ public class GameController {
                     backBtn.setVisible(false);
 
                     // Automatisch nach 3 Sekunden zurück in die Lobby
-                    javafx.animation.PauseTransition pause = new javafx.animation.PauseTransition(javafx.util.Duration.seconds(3));
-                    pause.setOnFinished(ev -> backToLobby());
-                    pause.play();
+                    returnToLobbyPause = new javafx.animation.PauseTransition(javafx.util.Duration.seconds(3));
+                    returnToLobbyPause.setOnFinished(ev -> backToLobby());
+                    returnToLobbyPause.play();
                     break;
 
                 case Protocol.SRV_ERROR:
@@ -313,12 +298,61 @@ public class GameController {
                     break;
 
                 case Protocol.SRV_START:
-                    if (!spectatorMode) {
-                        resetForNewMatch(payload);
+                    // Turnier: nächste Runde startet -> Lobby-Timer abbrechen
+                    if (returnToLobbyPause != null) {
+                        returnToLobbyPause.stop();
+                        returnToLobbyPause = null;
                     }
+                    spectatorMode = false;
+                    resetForNewMatch(payload);
+                    break;
+
+                case Protocol.SRV_SPECTATE_START:
+                    // Turnier: Eliminierter Spieler wird Zuschauer der nächsten Runde
+                    if (returnToLobbyPause != null) {
+                        returnToLobbyPause.stop();
+                        returnToLobbyPause = null;
+                    }
+                    setupSpectatorMode(payload);
                     break;
             }
         });
+    }
+
+    private void setupSpectatorMode(String rawPayload) {
+        spectatorMode = true;
+        mySymbol = 'S';
+        gameOver = false;
+        myTurn = false;
+        clearWinLine();
+
+        // Board zurücksetzen
+        for (int r = 0; r < 3; r++) {
+            for (int c = 0; c < 3; c++) {
+                board[r][c] = '\0';
+                buttons[r][c].setText("");
+                buttons[r][c].setStyle("");
+            }
+        }
+
+        // SSTART;sessionId;playerX;playerO  oder  sessionId;playerX;playerO
+        String[] p = rawPayload.split(Protocol.SEPARATOR);
+        String px = p.length >= 2 ? p[1] : "?";
+        String po = p.length >= 3 ? p[2] : "?";
+        // Falls das erste Token die Command-ID selbst ist (SSTART), anpassen
+        if (p.length >= 4) {
+            px = p[2];
+            po = p[3];
+        }
+
+        infoLabel.setText("Zuschauer | " + px + " (X) vs " + po + " (O)");
+        statusLabel.setText("Du schaust zu.");
+        setBoardEnabled(false);
+        rematchBtn.setDisable(true);
+        rematchBtn.setVisible(false);
+        backBtn.setDisable(false);
+        chatInput.setDisable(true);
+        sendChatBtn.setDisable(true);
     }
 
     private void resetForNewMatch(String payload) {
